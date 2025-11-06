@@ -1,0 +1,78 @@
+# Use official Ubuntu 22.04 base image
+FROM ubuntu:22.04
+
+# Set environment variables for non-interactive apt installs
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+# Install dependencies and utilities
+RUN apt-get update && apt-get install -y \
+    sudo \
+    wget \
+    gnupg2 \
+    software-properties-common \
+    lsb-release \
+    curl \
+    x11-apps \
+    libxcb-icccm4 \
+    libx11-xcb1 \
+    libxrender1 \
+    libxext6 \
+    libxrandr2 \
+    libxi6 \
+    libglib2.0-0 \
+    dbus-x11 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Chromium (without snap)
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    libgtk-3-0 \
+    libdbus-glib-1-2 \
+    libxt6 \
+    libxss1 \
+    libasound2 \
+    libx11-xcb1 \
+    dbus-x11 --no-install-recommends
+
+WORKDIR /opt
+RUN wget https://download-chromium.appspot.com/dl/Linux_x64 && \
+    unzip Linux_x64 && \
+    mv chrome-linux /opt/chromium
+
+# Add NVIDIA CUDA key and repo (for SDK Manager dependencies)
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb && \
+    dpkg -i cuda-keyring_1.0-1_all.deb && \
+    rm cuda-keyring_1.0-1_all.deb
+
+RUN apt-get update && apt-get install -y sdkmanager
+
+ARG USERNAME="sdkuser"
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+RUN groupadd -g $USER_GID $USERNAME && \
+    useradd -m -u $USER_UID -g $USER_GID -s /bin/bash $USERNAME && \
+    apt-get update && apt-get install -y sudo && \
+    echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME && \
+    chmod 0440 /etc/sudoers.d/$USERNAME
+
+## Set SDK Manager to use root user (container runs as root)
+##ENV SDKMANAGER_ROOT_USER_ALLOWED=true
+
+##WORKDIR /root
+
+# Make alias for browser that works
+RUN echo '#!/bin/bash\nexec /opt/chromium/chrome --no-sandbox "$@"' > /usr/local/bin/x-www-browser \
+    && chmod +x /usr/local/bin/x-www-browser
+
+# Set user and working directory
+USER sdkuser
+WORKDIR /home/sdkuser
+
+ENV BROWSER="/usr/local/bin/x-www-browser"
+RUN echo "alias x-www-browser='/opt/chromium/chrome --no-sandbox'" >> /home/sdkuser/.bashrc
+
+# Default command opens bash
+CMD ["/bin/bash"]

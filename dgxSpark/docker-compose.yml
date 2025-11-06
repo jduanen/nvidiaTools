@@ -1,0 +1,47 @@
+version: "3.9"
+services:
+  wyoming-whisper:
+    image: ghcr.io/slackr31337/wyoming-whisper-gpu:latest
+    container_name: wyoming-whisper
+    environment:
+      - MODEL=medium-int8
+      - LANGUAGE=en
+      - COMPUTE_TYPE=int8
+      - BEAM_SIZE=5
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - "10301:10301"
+    volumes:
+      - ./whisper-data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, utility, compute]
+    command: --uri tcp://0.0.0.0:10301
+
+  wyoming-piper:
+    image: ghcr.io/slackr31337/wyoming-piper-gpu:latest
+    container_name: wyoming-piper
+    environment:
+      - PIPER_VOICE=en_US-lessac-medium
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - "10201:10201"
+    volumes:
+      - ./piper-data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+                - utility
+                - compute
+    command: --uri tcp://0.0.0.0:10201
